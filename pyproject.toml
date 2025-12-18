@@ -5,5 +5,26 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy>=1.24.0,<1.26.0",
+    "librosa==0.11.0",
+    "s3tokenizer",
+    "torch==2.6.0",
+    "torchaudio==2.6.0",
+    "transformers==4.46.3",
+    "diffusers==0.29.0",
+    "resemble-perth==1.0.1",
+    "conformer==0.3.2",
+    "safetensors==0.5.3",
+    "spacy-pkuseg",
+    "pykakasi==2.3.0",
+    "gradio==5.44.1",
+    "pyloudnorm",
+    "omegaconf",
+    "chatterbox-tts>=0.1.6",
     "langgraph>=1.0.5",
+    "onnx==1.18",
+    "peft>=0.18.0",
 ]
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true
