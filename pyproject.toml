@@ -26,6 +26,8 @@ dependencies = [
     "peft>=0.18.0",
     "loguru>=0.7.3",
     "prompt-toolkit>=3.0.52",
+    "chromadb>=1.4.1",
+    "pypdf>=6.6.0",
 ]
 
 [[tool.uv.index]]
