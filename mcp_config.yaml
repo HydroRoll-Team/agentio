@@ -1,0 +1,58 @@
+# MCP Server Configuration for AgentIO
+# 
+# This file defines MCP servers to connect at startup.
+# Each server provides tools that the ReAct agent can use.
+
+servers:
+  # Custom search server for web searches
+  - name: search
+    command: python
+    args:
+      - mcp_servers/search_server.py
+    description: "Provides web_search tool using DuckDuckGo API"
+  
+  # Optional: File system operations (requires Node.js and npx)
+  # Uncomment to enable filesystem access
+  - name: filesystem
+    command: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "./knowledge"
+    description: "Provides file read/write/search within knowledge directory"
+  
+  # Optional: GitHub integration (requires GitHub token)
+  # Uncomment and set GITHUB_TOKEN environment variable
+  # - name: github
+  #   command: npx
+  #   args:
+  #     - "-y"
+  #     - "@modelcontextprotocol/server-github"
+  #   env:
+  #     GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+  #   description: "Provides GitHub repository operations"
+  
+  # Optional: Brave Search (requires Brave API key, better quality than DuckDuckGo)
+  # Uncomment and set BRAVE_API_KEY environment variable
+  # - name: brave-search
+  #   command: npx
+  #   args:
+  #     - "-y"
+  #     - "@modelcontextprotocol/server-brave-search"
+  #   env:
+  #     BRAVE_API_KEY: "${BRAVE_API_KEY}"
+  #   description: "Provides high-quality web search via Brave API"
+
+# Usage in code:
+# import yaml
+# 
+# with open("mcp_config.yaml") as f:
+#     config = yaml.safe_load(f)
+# 
+# for server_cfg in config["servers"]:
+#     await mcp_manager.connect_server(
+#         name=server_cfg["name"],
+#         command=server_cfg["command"],
+#         args=server_cfg["args"],
+#         env=server_cfg.get("env")
+#     )

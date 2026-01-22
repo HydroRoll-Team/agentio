@@ -28,6 +28,10 @@ dependencies = [
     "prompt-toolkit>=3.0.52",
     "chromadb>=1.4.1",
     "pypdf>=6.6.0",
+    "mcp>=1.0.0",
+    "pydantic>=2.0",
+    "ddgs>=8.0.0",
+    "httpx>=0.28.1",
 ]
 
 [[tool.uv.index]]
