@@ -24,27 +24,27 @@ async def list_tools() -> List[Tool]:
     """
     return [
         Tool(
-            name="web_search",  # 工具名称，用于标识和调用
+            name="web_search",
             description=(
-                "Search the web for current information using DuckDuckGo. "  # 工具的主要功能描述
+                "Search the web for current information using DuckDuckGo. " 
                 "Use this tool when the knowledge base doesn't have information "
-                "about recent events, current data, or topics outside the knowledge base. "  # 知识库限制说明
-                "Returns top search results with titles, snippets, and URLs."  # 返回结果说明
+                "about recent events, current data, or topics outside the knowledge base. " 
+                "Returns top search results with titles, snippets, and URLs."
             ),
-            inputSchema={  # 输入参数的JSON Schema定义
-                "type": "object",  # 输入类型为对象
-                "properties": {  # 参数属性定义
-                    "query": {  # 搜索查询参数
-                        "type": "string",  # 参数类型为字符串
-                        "description": "Search query (supports English and Chinese)"  # 参数描述，支持中英文
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (supports English and Chinese)"
                     },
-                    "max_results": {  # 最大结果数参数
-                        "type": "integer",  # 参数类型为整数
-                        "description": "Maximum number of results to return (default: 5)",  # 参数描述，默认返回5个结果
-                        "default": 5  # 默认值设置为5
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 5)",
+                        "default": 5
                     }
                 },
-                "required": ["query"]  # 必需参数列表，query为必需参数
+                "required": ["query"]
             }
         )
     ]
@@ -134,14 +134,7 @@ async def perform_web_search(query: str, max_results: int = 5) -> List[Dict[str,
 
 
 async def main():
-    """
-    主异步函数，用于启动应用程序并处理输入输出流。
-    使用异步上下文管理器管理stdio_server，确保资源正确释放。
-    """
     async with stdio_server() as (read_stream, write_stream):
-        # 通过stdio_server创建输入输出流
-        # read_stream: 用于读取输入数据的流
-        # write_stream: 用于写入输出数据的流
         await app.run(
             read_stream,
             write_stream,

@@ -3,7 +3,7 @@ import re
 import json
 import asyncio
 import hashlib
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 import httpx
 import chromadb
