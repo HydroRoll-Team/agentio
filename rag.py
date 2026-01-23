@@ -13,25 +13,28 @@ from pypdf import PdfReader
 
 
 class OllamaClient:
-    def __init__(self, api_base: str = "http://localhost:11434"):
+    def __init__(
+        self, api_base: str = "http://localhost:11434", model_name: str = "gemma3:12b"
+    ):
         self.api_base = api_base.rstrip("/")
+        self.model_name = model_name
 
-    async def generate(self, model: str, _prompt: str) -> str:
+    async def generate(self, _prompt: str) -> str:
         """非流式：一次性返回完整 response"""
         url = f"{self.api_base}/api/generate"
-        payload = {"model": model, "prompt": _prompt, "stream": False}
+        payload = {"model": self.model_name, "prompt": _prompt, "stream": False}
         async with httpx.AsyncClient() as client:
             r = await client.post(url, json=payload, timeout=300)
             r.raise_for_status()
             return r.json()["response"]
 
-    async def stream_generate(self, model: str, _prompt: str):
+    async def stream_generate(self, _prompt: str):
         """
         流式：异步生成器，逐 token yield
         Ollama 返回 NDJSON：一行一个 JSON
         """
         url = f"{self.api_base}/api/generate"
-        payload = {"model": model, "prompt": _prompt, "stream": True}
+        payload = {"model": self.model_name, "prompt": _prompt, "stream": True}
 
         # timeout=None：避免长输出被 httpx 超时中断
         async with httpx.AsyncClient(timeout=None) as client:
@@ -46,14 +49,14 @@ class OllamaClient:
                     if data.get("done"):
                         break
 
-    async def embed(self, model: str, text: str) -> List[float]:
+    async def embed(self, embedding_model: str, text: str) -> List[float]:
         """
         Ollama embeddings API:
         POST /api/embeddings
         { "model": "...", "prompt": "..." }
         """
         url = f"{self.api_base}/api/embeddings"
-        payload = {"model": model, "prompt": text}
+        payload = {"model": embedding_model, "prompt": text}
         async with httpx.AsyncClient(timeout=300) as client:
             r = await client.post(url, json=payload)
             r.raise_for_status()
@@ -107,10 +110,17 @@ def normalize_whitespace(s: str) -> str:
 
 def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> List[str]:
     """
-    简单稳定的分块：
-    - 先按空行分段
-    - 合并到 chunk_size 左右
-    - 加一点 overlap 防止断句丢信息
+    分块：
+    1. 先按空行分段
+    2. 合并到 chunk_size 长度
+    3. overlap 防止断句丢信息
+
+    chunks = [
+        "ABCDEE",
+        "EE\nFGHIJ",
+        "IJ\nKLMNO",
+        ...
+    ]
     """
     text = normalize_whitespace(text)
     paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
@@ -139,7 +149,7 @@ def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> Li
 
     flush()
 
-    # overlap：每个 chunk 前面附上一点上一块尾巴
+    # 每个 chunk 前面附上一点上一块尾巴
     if chunk_overlap > 0 and len(chunks) > 1:
         overlapped = [chunks[0]]
         for i in range(1, len(chunks)):
@@ -151,12 +161,9 @@ def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> Li
 
 
 def validate_collection_name(name: str):
-    # 3-512 chars, [a-zA-Z0-9._-], start/end with alnum
+    # 3-512 字符, [a-zA-Z0-9._-]
     if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,510}[a-zA-Z0-9]$", name):
-        raise ValueError(
-            f"Invalid collection_name='{name}'. Must be 3-512 chars, "
-            "allowed [a-zA-Z0-9._-], start/end with alphanumeric."
-        )
+        raise ValueError(f"无效的 collection_name='{name}'")
 
 
 def make_id(source: str, chunk_index: int, chunk_text: str) -> str:
@@ -213,17 +220,18 @@ def build_rag_prompt(user_question: str, contexts: List[Dict[str, Any]]) -> str:
 
     return f"""你是一个严谨的资料问答助手。请只根据“给定资料片段”回答问题；资料没有覆盖就说不知道，不要编。
 
-【给定资料片段】
-{ctx}
+    【给定资料片段】
+    {ctx}
 
-【用户问题】
-{user_question}
+    【用户问题】
+    {user_question}
 
-【回答要求】
-- 用中文回答
-- 尽量引用具体片段内容（可点名“片段1/2/3”）
-- 不要胡编
-"""
+    【回答要求】
+    - 用中文回答
+    - 尽量引用具体片段内容（可点名“片段1/2/3”，然后在回答完毕后附上片段原文）
+    - 如果资料中没有答案，请明确回复“资料中未覆盖该问题”
+    - 不要胡编
+    """
 
 
 async def ingest_folder(
@@ -233,21 +241,19 @@ async def ingest_folder(
     docs_dir: str,
     chunk_size: int = 900,
     chunk_overlap: int = 150,
-    batch_size: int = 32,
-    concurrency: int = 16,
+    batch_size: int = 128,
+    concurrency: int = 256,
 ):
     docs = load_documents(docs_dir)
     if not docs:
         print(f"未找到可导入文档：{docs_dir}")
         return
 
-    print(f"发现 {len(docs)} 个文档，开始切块+入库…")
+    print(f"发现 {len(docs)} 个文档，开始切块+入库…（GPU加速，并发={concurrency}，batch_size={batch_size}）")
 
-    sem = asyncio.Semaphore(concurrency)
-
+    # 移除并发限制，让所有请求同时提交到 GPU
     async def embed_one(text: str) -> List[float]:
-        async with sem:
-            return await ollama.embed(embedding_model, text)
+        return await ollama.embed(embedding_model, text)
 
     ids, metadatas, documents, embeddings = [], [], [], []
 
@@ -298,7 +304,6 @@ async def ingest_folder(
 async def answer_with_rag_stream(
     rag: ChromaRAG,
     ollama: OllamaClient,
-    llm_model: str,
     embedding_model: str,
     question: str,
     top_k: int = 5,
@@ -323,20 +328,16 @@ async def answer_with_rag_stream(
             }
         )
 
-    # 3) build prompt
     rag_prompt = build_rag_prompt(question, contexts)
 
-    # 4) stream generate
-    async for token in ollama.stream_generate(llm_model, rag_prompt):
+    async for token in ollama.stream_generate(rag_prompt):
         yield token
 
 
 async def main():
-    llm_model = "gemma3:12b"
-    embedding_model = "nomic-embed-text"  # 先确保：ollama pull nomic-embed-text
+    embedding_model = "nomic-embed-text"
     docs_dir = "./knowledge"
 
-    # 你也可以换成：kb_docs_v2 / agentio_kb_v1 ...（>=3字符）
     rag = ChromaRAG(persist_dir="./chroma_db", collection_name="kb_docs_v1")
     ollama = OllamaClient("http://localhost:11434")
 
@@ -346,7 +347,6 @@ async def main():
     print("  /ingest   -> 导入 ./knowledge 下的 PDF/MD 到 Chroma")
     print("  /count    -> 查看向量库条目数")
     print("  /exit     -> 退出")
-    print("开始聊天（默认走 RAG + 流式输出）。")
 
     while True:
         user_input = await loop.run_in_executor(None, lambda: prompt("User: "))
@@ -367,13 +367,11 @@ async def main():
                 docs_dir=docs_dir,
             )
             continue
-
-        # 普通问答：RAG + 流式输出
+        
         print("LLM: ", end="", flush=True)
         async for token in answer_with_rag_stream(
             rag=rag,
             ollama=ollama,
-            llm_model=llm_model,
             embedding_model=embedding_model,
             question=user_input,
             top_k=5,
