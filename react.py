@@ -697,47 +697,59 @@ async def main():
     print("  /react <q>  以 ReAct 模式回答")
     print("  /exit    退出")
 
-    while True:
-        user_input = await loop.run_in_executor(None, lambda: prompt("User: "))
-        cmd = user_input.strip()
+    try:
+        while True:
+            try:
+                user_input = await loop.run_in_executor(None, lambda: prompt("User: "))
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                print("\n退出程序...")
+                break
+            
+            cmd = user_input.strip()
 
-        if cmd.lower() in {"exit", "quit", "/exit"}:
-            break
+            if cmd.lower() in {"exit", "quit", "/exit"}:
+                break
 
-        if cmd == "/count":
-            print(f"Chroma count = {rag.count()}")
-            continue
+            if cmd == "/count":
+                print(f"Chroma count = {rag.count()}")
+                continue
 
-        if cmd == "/ingest":
-            await ingest_folder(
+            if cmd == "/ingest":
+                await ingest_folder(
+                    rag=rag,
+                    ollama=ollama,
+                    embedding_model=embedding_model,
+                    docs_dir=docs_dir,
+                )
+                continue
+
+            if cmd.startswith("/react"):
+                question = cmd[len("/react") :].strip()
+                if not question:
+                    print("请在 /react 后输入问题。")
+                    continue
+                print("ReAct agent 正在思考…")
+                answer = await agent.run(question)
+                print(f"LLM: {answer}")
+                continue
+
+            print("LLM: ", end="", flush=True)
+            async for token in answer_with_rag_stream(
                 rag=rag,
                 ollama=ollama,
+                llm_model=llm_model,
                 embedding_model=embedding_model,
-                docs_dir=docs_dir,
-            )
-            continue
-
-        if cmd.startswith("/react"):
-            question = cmd[len("/react") :].strip()
-            if not question:
-                print("请在 /react 后输入问题。")
-                continue
-            print("ReAct agent 正在思考…")
-            answer = await agent.run(question)
-            print(f"LLM: {answer}")
-            continue
-
-        print("LLM: ", end="", flush=True)
-        async for token in answer_with_rag_stream(
-            rag=rag,
-            ollama=ollama,
-            llm_model=llm_model,
-            embedding_model=embedding_model,
-            question=user_input,
-            top_k=5,
-        ):
-            print(token, end="", flush=True)
-        print("\n")
+                question=user_input,
+                top_k=5,
+            ):
+                print(token, end="", flush=True)
+            print("\n")
+    finally:
+        if mcp_manager:
+            try:
+                await mcp_manager.close()
+            except Exception as e:
+                logger.debug(f"Error closing MCP manager: {e}")
 
 
 if __name__ == "__main__":

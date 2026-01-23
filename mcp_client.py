@@ -267,3 +267,18 @@ class MCPClientManager:
         self.tools.clear()
         # 清空所有服务器进程的字典
         self._server_processes.clear()
+
+    async def close(self):
+        """
+        关闭所有 MCP 服务器连接的别名方法
+        
+        这是 disconnect_all 的别名方法，提供更符合直觉的接口名称。
+        
+        Example:
+            >>> try:
+            ...     # 使用管理器执行一些操作
+            ...     pass
+            ... finally:
+            ...     await manager.close()
+        """
+        await self.disconnect_all()
