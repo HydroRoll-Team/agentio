@@ -53,7 +53,7 @@ async def list_tools() -> List[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     if name != "web_search":
-        raise ValueError(f"Unknown tool: {name}")
+        raise ValueError(f"未知工具: {name}")
 
     query = arguments.get("query", "")
     max_results = arguments.get("max_results", 5)
@@ -61,7 +61,7 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     if not query:
         return [TextContent(
             type="text",
-            text="Error: 'query' parameter is required"
+            text="错误：缺少必需的参数 'query'"
         )]
     
     try:
@@ -70,20 +70,20 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
         if not results:
             return [TextContent(
                 type="text",
-                text=f"No search results found for query: {query}"
+                text=f"未找到与查询相关的搜索结果: {query}"
             )]
         
-        response_lines = [f"Web search results for '{query}':\n"]
+        response_lines = [f"网络搜索结果 '{query}':\n"]
         
         for i, result in enumerate(results, 1):
-            title = result.get("title", "No title")
-            snippet = result.get("body", result.get("snippet", "No description"))
+            title = result.get("title", "无标题")
+            snippet = result.get("body", result.get("snippet", "无描述"))
             url = result.get("href", result.get("url", ""))
             
             response_lines.append(f"{i}. {title}")
             response_lines.append(f"   {snippet}")
             if url:
-                response_lines.append(f"   URL: {url}")
+                response_lines.append(f"   链接: {url}")
             response_lines.append("") 
         
         return [TextContent(
@@ -94,7 +94,7 @@ async def call_tool(name: str, arguments: Any) -> List[TextContent]:
     except Exception as e:
         return [TextContent(
             type="text",
-            text=f"Error performing web search: {str(e)}"
+            text=f"执行网络搜索时出错: {str(e)}"
         )]
 
 
@@ -117,7 +117,7 @@ async def perform_web_search(query: str, max_results: int = 5) -> List[Dict[str,
                         return result_list
                     
                 except Exception as e:
-                    print(f"Search attempt {attempt + 1} failed: {e}", file=sys.stderr)
+                    print(f"搜索尝试 {attempt + 1} 失败: {e}", file=sys.stderr)
                     if attempt == 0:
                         import time
                         time.sleep(1)
@@ -129,7 +129,7 @@ async def perform_web_search(query: str, max_results: int = 5) -> List[Dict[str,
         return results
         
     except Exception as e:
-        print(f"Search error: {e}", file=sys.stderr)
+        print(f"搜索错误: {e}", file=sys.stderr)
         return []
 
 

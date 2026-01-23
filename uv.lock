@@ -41,7 +41,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "librosa" },
     { name = "loguru" },
-    { name = "mcp" },
+    { name = "mcp", extra = ["cli"] },
     { name = "numpy" },
     { name = "omegaconf" },
     { name = "onnx" },
@@ -72,7 +72,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.0.5" },
     { name = "librosa", specifier = "==0.11.0" },
     { name = "loguru", specifier = ">=0.7.3" },
-    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
     { name = "numpy", specifier = ">=1.24.0,<1.26.0" },
     { name = "omegaconf" },
     { name = "onnx", specifier = "==1.18" },
@@ -1826,6 +1826,12 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/d5/2d/649d80a0ecf6a1f82632ca44bec21c0461a9d9fc8934d38cb5b319f2db5e/mcp-1.25.0.tar.gz", hash = "sha256:56310361ebf0364e2d438e5b45f7668cbb124e158bb358333cd06e49e83a6802" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/e2/fc/6dc7659c2ae5ddf280477011f4213a74f806862856b796ef08f028e664bf/mcp-1.25.0-py3-none-any.whl", hash = "sha256:b37c38144a666add0862614cc79ec276e97d72aa8ca26d622818d4e278b9721a" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "python-dotenv" },
+    { name = "typer" },
 ]
 
 [[package]]
