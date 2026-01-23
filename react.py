@@ -463,8 +463,6 @@ async def ingest_folder(
 async def answer_with_rag_stream(
     rag: ChromaRAG,
     ollama: OllamaClient,
-    llm_model: str,
-    embedding_model: str,
     question: str,
     top_k: int = 5,
 ):
@@ -479,8 +477,6 @@ async def answer_with_rag_stream(
     Args:
         rag (ChromaRAG): RAG 系统实例
         ollama (OllamaClient): Ollama 客户端
-        llm_model (str): 使用的 LLM 模型名称
-        embedding_model (str): 使用的嵌入模型名称
         question (str): 用户的问题
         top_k (int): 检索的文档数量，默认 5
 
@@ -622,25 +618,44 @@ class ReActAgent:
             mcp_tools_desc = self.mcp.get_tools_description()
 
         for turn in range(self.max_turns):
+            print(f"ReAct 轮次 {turn + 1}/{self.max_turns}")
+            
             prompt_text = build_react_prompt(
                 question, "\n".join(scratch), mcp_tools_desc
             )
             reply = await self.ollama.generate(prompt_text)
 
+            #! 提取 Thought
+            thought_match = re.search(r"Thought\s*:\s*(.+?)(?=\nAction|$)", reply, re.S)
+            if thought_match:
+                thought = thought_match.group(1).strip()
+                print(f"Thought: {thought}")
+            
+            #! 检查是否有 Final Answer
             final_match = re.search(r"Final Answer\s*:\s*(.+)", reply, re.S)
             if final_match:
-                return final_match.group(1).strip()
+                final_answer = final_match.group(1).strip()
+                print(f"\nFinal Answer: {final_answer}\n")
+                return final_answer
 
+            #! 提取 Action 和 Action Input
             action_match = re.search(r"Action\s*:\s*([a-zA-Z_]+)", reply)
-            input_match = re.search(r"Action Input\s*:\s*(.+)", reply, re.S)
+            input_match = re.search(r"Action Input\s*:\s*(.+?)(?=\n|$)", reply, re.S)
 
             if not action_match or not input_match:
+                print(f"无法解析 Action，返回原始回复")
                 return reply.strip()
 
             action = action_match.group(1).strip()
             action_input = input_match.group(1).strip()
+            
+            print(f"Action: {action}")
+            print(f"Action Input: {action_input}")
 
+            #! 执行工具并获取观察结果
             observation = await self._call_tool(action, action_input)
+            print(f"Observation: {observation[:300]}{'...' if len(observation) > 300 else ''}")
+            
             scratch.append(reply.strip())
             scratch.append(f"Observation: {observation}")
 
@@ -657,23 +672,10 @@ async def main():
 
     mcp_manager = MCPClientManager()
     try:
-        logger.info("Connecting to MCP search server...")
-
-        import os
-
-        search_mode = os.getenv("SEARCH_MODE", "mock")
-
-        if search_mode == "real":
-            server_script = "mcp_servers/search_server.py"
-            logger.info("Using real DuckDuckGo search")
-        else:
-            server_script = "mcp_servers/mock_search_server.py"
-            logger.info("Using mock search (set SEARCH_MODE=real for real search)")
-
+        server_script = "mcp_servers/search_server.py"
         await mcp_manager.connect_server(
             name="search", command="python", args=[server_script]
         )
-        logger.success("MCP search server connected successfully")
     except Exception as e:
         logger.warning(
             f"Failed to connect MCP server: {e}. Continuing without MCP support."
