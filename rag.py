@@ -251,7 +251,6 @@ async def ingest_folder(
 
     print(f"发现 {len(docs)} 个文档，开始切块+入库…（GPU加速，并发={concurrency}，batch_size={batch_size}）")
 
-    # 移除并发限制，让所有请求同时提交到 GPU
     async def embed_one(text: str) -> List[float]:
         return await ollama.embed(embedding_model, text)
 
@@ -267,7 +266,7 @@ async def ingest_folder(
         print(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
         ids, metadatas, documents, embeddings = [], [], [], []
 
-    # 收集所有 chunks（也可以按文档分批，避免一次性太大）
+    # 收集所有 chunks
     pending = []
 
     for d in docs:
@@ -308,10 +307,8 @@ async def answer_with_rag_stream(
     question: str,
     top_k: int = 5,
 ):
-    # 1) embed question
     q_emb = await ollama.embed(embedding_model, question)
 
-    # 2) retrieve
     result = rag.query(q_emb, n_results=top_k)
     docs = (result.get("documents") or [[]])[0]
     metas = (result.get("metadatas") or [[]])[0]
@@ -342,11 +339,10 @@ async def main():
     ollama = OllamaClient("http://localhost:11434")
 
     loop = asyncio.get_event_loop()
-
-    print("命令：")
-    print("  /ingest   -> 导入 ./knowledge 下的 PDF/MD 到 Chroma")
-    print("  /count    -> 查看向量库条目数")
-    print("  /exit     -> 退出")
+    
+    print("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
+    print("  /count  查看向量库条目数")
+    print("  /exit   退出")
 
     while True:
         user_input = await loop.run_in_executor(None, lambda: prompt("User: "))

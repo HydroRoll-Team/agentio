@@ -157,21 +157,6 @@ def read_text(path: str) -> str:
 
 
 def load_documents(root_dir: str) -> List[Dict[str, Any]]:
-    """
-    从目录加载所有支持的文档
-
-    递归遍历指定目录，加载所有 PDF、Markdown 和文本文件。
-
-    Args:
-        root_dir (str): 要扫描的根目录路径
-
-    Returns:
-        List[Dict[str, Any]]: 文档列表，每个元素包含 source 和 text 字段
-
-    Example:
-        >>> docs = load_documents("./knowledge")
-        >>> print(f"Loaded {len(docs)} documents")
-    """
     docs = []
     for base, _, files in os.walk(root_dir):
         for fn in files:
@@ -196,18 +181,7 @@ def normalize_whitespace(s: str) -> str:
     规范化文本中的空白字符
 
     将不换行空格替换为普通空格，合并连续空格，
-    并将连续的多个换行符压缩为最多两个。
-
-    Args:
-        s (str): 要规范化的文本
-
-    Returns:
-        str: 规范化后的文本
-
-    Example:
-        >>> normalized = normalize_whitespace("Hello   world\n\n\n")
-        >>> print(normalized)
-        Hello world\n\n
+    并将连续的多个换行符压缩为最多
     """
     s = s.replace("\u00a0", " ")
     s = re.sub(r"[ \t]+", " ", s)
@@ -219,7 +193,6 @@ def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> Li
     """
     将文本分割成重叠的块
 
-    该方法实现了稳定的文本分块策略：
     1. 先按空行将文本分成段落
     2. 将段落合并到接近 chunk_size 大小
     3. 添加 overlap 防止语义在边界处丢失
@@ -275,45 +248,13 @@ def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> Li
 
 
 def validate_collection_name(name: str):
-    """
-    验证 ChromaDB 集合名称的有效性
-
-    ChromaDB 要求集合名称：
-    - 长度为 3-512 个字符
-    - 只能包含字母、数字、点、下划线和连字符
-    - 必须以字母或数字开头和结尾
-
-    Args:
-        name (str): 要验证的集合名称
-
-    Raises:
-        ValueError: 当名称不符合要求时抛出
-
-    Example:
-        >>> validate_collection_name("kb_docs_v1")  # OK
-        >>> validate_collection_name("a")  # Raises ValueError
-    """
-    # 3-512 chars, [a-zA-Z0-9._-], start/end with alnum
     if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,510}[a-zA-Z0-9]$", name):
-        raise ValueError(
-            f"Invalid collection_name='{name}'. Must be 3-512 chars, "
-            "allowed [a-zA-Z0-9._-], start/end with alphanumeric."
-        )
+        raise ValueError
 
 
 def make_id(source: str, chunk_index: int, chunk_text: str) -> str:
     """
     为文档块生成唯一标识符
-
-    使用 SHA1 哈希算法，基于源文件路径、块索引和块内容生成唯一 ID。
-
-    Args:
-        source (str): 源文件路径
-        chunk_index (int): 块的索引
-        chunk_text (str): 块的文本内容
-
-    Returns:
-        str: 40 个字符的十六进制哈希字符串
 
     Example:
         >>> doc_id = make_id("doc.pdf", 0, "First chunk")
@@ -327,10 +268,7 @@ def make_id(source: str, chunk_index: int, chunk_text: str) -> str:
 
 class ChromaRAG:
     """
-    基于 ChromaDB 的 RAG (Retrieval-Augmented Generation) 实现
-
-    该类封装了 ChromaDB 的向量存储和检索功能，用于构建知识库
-    和执行语义搜索。支持文档的增删改查操作。
+    基于 ChromaDB 的 RAG
 
     Attributes:
         client: ChromaDB 持久化客户端
@@ -352,15 +290,6 @@ class ChromaRAG:
         self.col = self.client.get_or_create_collection(name=collection_name)
 
     def count(self) -> int:
-        """
-        获取集合中的文档数量
-
-        Returns:
-            int: 集合中的文档总数
-
-        Example:
-            >>> print(rag.count())
-        """
         return self.col.count()
 
     def upsert(
@@ -400,7 +329,7 @@ class ChromaRAG:
         """
         执行语义搜索查询
 
-        根据查询嵌入向量检索最相似的文档。
+        根据查询嵌入向量检索最相似的文档
 
         Args:
             query_embedding (List[float]): 查询文本的嵌入向量
@@ -448,18 +377,18 @@ def build_rag_prompt(user_question: str, contexts: List[Dict[str, Any]]) -> str:
 
     return f"""你是一个严谨的资料问答助手。请只根据“给定资料片段”回答问题；资料没有覆盖就说不知道，不要编。
 
-【给定资料片段】
-{ctx}
+    【给定资料片段】
+    {ctx}
 
-【用户问题】
-{user_question}
+    【用户问题】
+    {user_question}
 
-【回答要求】
-- 用中文回答
-- 尽量引用具体片段内容（可点名“片段1/2/3”）
-- 不要胡编
-- 点名后在末尾添加引用来源，例如：“（见片段2）”
-"""
+    【回答要求】
+    - 用中文回答
+    - 尽量引用具体片段内容（可点名“片段1/2/3”）
+    - 不要胡编
+    - 点名后在末尾添加引用来源，例如：“（片段2原文）”
+    """
 
 
 async def ingest_folder(
@@ -472,33 +401,6 @@ async def ingest_folder(
     batch_size: int = 32,
     concurrency: int = 16,
 ):
-    """
-    将目录中的文档导入到 RAG 系统
-
-    该函数会：
-    1. 加载目录中的所有文档
-    2. 将文档分割成块
-    3. 为每个块生成嵌入向量
-    4. 将块批量插入到向量数据库
-
-    Args:
-        rag (ChromaRAG): RAG 系统实例
-        ollama (OllamaClient): Ollama 客户端，用于生成嵌入
-        embedding_model (str): 使用的嵌入模型名称
-        docs_dir (str): 要导入的文档目录
-        chunk_size (int): 文本块大小，默认 900
-        chunk_overlap (int): 块重叠大小，默认 150
-        batch_size (int): 批量插入的大小，默认 32
-        concurrency (int): 并发生成嵌入的并发数，默认 16
-
-    Example:
-        >>> await ingest_folder(
-        ...     rag=rag,
-        ...     ollama=ollama,
-        ...     embedding_model="nomic-embed-text",
-        ...     docs_dir="./knowledge"
-        ... )
-    """
     docs = load_documents(docs_dir)
     if not docs:
         print(f"未找到可导入文档：{docs_dir}")
@@ -524,7 +426,7 @@ async def ingest_folder(
         print(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
         ids, metadatas, documents, embeddings = [], [], [], []
 
-    # 收集所有 chunks（也可以按文档分批，避免一次性太大）
+    # 收集所有 chunks
     pending = []
 
     for d in docs:
@@ -569,7 +471,6 @@ async def answer_with_rag_stream(
     """
     使用 RAG 流式回答问题
 
-    该函数会：
     1. 为问题生成嵌入向量
     2. 检索最相关的文档片段
     3. 构建提示词
@@ -590,10 +491,8 @@ async def answer_with_rag_stream(
         >>> async for token in answer_with_rag_stream(rag, ollama, "gemma3:12b", "nomic-embed-text", "什么是 Python?"):
         ...     print(token, end="", flush=True)
     """
-    # 1) embed question
-    q_emb = await ollama.embed(embedding_model, question)
+    q_emb = await ollama.embed(question)
 
-    # 2) retrieve
     result = rag.query(q_emb, n_results=top_k)
     docs = (result.get("documents") or [[]])[0]
     metas = (result.get("metadatas") or [[]])[0]
@@ -610,23 +509,15 @@ async def answer_with_rag_stream(
             }
         )
 
-    # 3) build prompt
     rag_prompt = build_rag_prompt(question, contexts)
 
-    # 4) stream generate
-    async for token in ollama.stream_generate(llm_model, rag_prompt):
+    async for token in ollama.stream_generate(rag_prompt):
         yield token
 
 
 def build_react_prompt(question: str, scratchpad: str, mcp_tools_desc: str = "") -> str:
-    """
-    ReAct prompt with dynamic tool list including MCP tools.
-    """
-
-    # Built-in tool
     builtin_tools = "search_kb: use this to search the knowledge base and retrieve relevant passages."
 
-    # Combine with MCP tools
     if mcp_tools_desc:
         all_tools = builtin_tools + "\n" + mcp_tools_desc
     else:
@@ -643,7 +534,7 @@ def build_react_prompt(question: str, scratchpad: str, mcp_tools_desc: str = "")
     )
 
     return (
-        "你是一个可以使用工具的助手，需遵循 ReAct 流程。\n"
+        "你是一个可以使用工具的助手。\n"
         "工具列表:\n"
         f"- {all_tools}\n\n"
         "规则:\n"
@@ -690,7 +581,7 @@ class ReActAgent:
         self.max_turns = max_turns
 
     async def _tool_search_kb(self, query: str) -> str:
-        q_emb = await self.ollama.embed(self.embedding_model, query)
+        q_emb = await self.ollama.embed(query)
         result = self.rag.query(q_emb, n_results=self.top_k)
         docs = (result.get("documents") or [[]])[0]
         metas = (result.get("metadatas") or [[]])[0]
@@ -710,17 +601,14 @@ class ReActAgent:
         return _summarize_contexts_for_observation(contexts)
 
     async def _call_tool(self, action: str, action_input: str) -> str:
-        # Try MCP tools first
         if self.mcp and action in self.mcp.list_tools():
             try:
                 logger.info(f"Calling MCP tool: {action}")
                 result = await self.mcp.call_tool(action, {"query": action_input})
                 return result
             except Exception as e:
-                logger.error(f"MCP tool '{action}' failed: {e}")
                 return f"Error calling {action}: {str(e)}"
 
-        # Fallback to built-in tools
         if action == "search_kb":
             return await self._tool_search_kb(action_input)
 
@@ -729,7 +617,6 @@ class ReActAgent:
     async def run(self, question: str) -> str:
         scratch = []
 
-        # Get MCP tools description if available
         mcp_tools_desc = ""
         if self.mcp:
             mcp_tools_desc = self.mcp.get_tools_description()
@@ -738,7 +625,7 @@ class ReActAgent:
             prompt_text = build_react_prompt(
                 question, "\n".join(scratch), mcp_tools_desc
             )
-            reply = await self.ollama.generate(self.llm_model, prompt_text)
+            reply = await self.ollama.generate(prompt_text)
 
             final_match = re.search(r"Final Answer\s*:\s*(.+)", reply, re.S)
             if final_match:
@@ -762,29 +649,24 @@ class ReActAgent:
 
 async def main():
     llm_model = "gemma3:12b"
-    embedding_model = "nomic-embed-text"  # 先确保：ollama pull nomic-embed-text
+    embedding_model = "nomic-embed-text"  
     docs_dir = "./knowledge"
 
-    # 你也可以换成：kb_docs_v2 / agentio_kb_v1 ...（>=3字符）
     rag = ChromaRAG(persist_dir="./chroma_db", collection_name="kb_docs_v1")
     ollama = OllamaClient("http://localhost:11434")
 
-    # Initialize MCP manager and connect to search server
     mcp_manager = MCPClientManager()
     try:
         logger.info("Connecting to MCP search server...")
 
-        # 使用环境变量控制搜索模式
         import os
 
-        search_mode = os.getenv("SEARCH_MODE", "mock")  # mock | real
+        search_mode = os.getenv("SEARCH_MODE", "mock")
 
         if search_mode == "real":
-            # 真实 DuckDuckGo 搜索（需要网络访问）
             server_script = "mcp_servers/search_server.py"
             logger.info("Using real DuckDuckGo search")
         else:
-            # 模拟搜索（无需网络，适合测试）
             server_script = "mcp_servers/mock_search_server.py"
             logger.info("Using mock search (set SEARCH_MODE=real for real search)")
 
@@ -810,12 +692,10 @@ async def main():
 
     loop = asyncio.get_event_loop()
 
-    print("命令：")
-    print("  /ingest   -> 导入 ./knowledge 下的 PDF/MD 到 Chroma")
-    print("  /count    -> 查看向量库条目数")
-    print("  /react <q>-> 以 ReAct 模式回答问题（会多轮思考+检索）")
-    print("  /exit     -> 退出")
-    print("开始聊天（默认走 RAG + 流式输出）。")
+    print("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
+    print("  /count   查看向量库条目数")
+    print("  /react <q>  以 ReAct 模式回答")
+    print("  /exit    退出")
 
     while True:
         user_input = await loop.run_in_executor(None, lambda: prompt("User: "))
@@ -847,7 +727,6 @@ async def main():
             print(f"LLM: {answer}")
             continue
 
-        # 普通问答：RAG + 流式输出
         print("LLM: ", end="", flush=True)
         async for token in answer_with_rag_stream(
             rag=rag,
