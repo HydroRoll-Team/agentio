@@ -35,7 +35,7 @@ class OllamaClient:
     """
 
     def __init__(
-        self, api_base: str = "http://localhost:11434", generate_model: str = "gemma3:12b", embed_model: str = "nomic-embed-text"
+        self, api_base: str = "http://localhost:11434", generate_model: str = "qwen3:0.6b", embed_model: str = "nomic-embed-text"
     ):
         self.api_base = api_base.rstrip("/")
         self.generate_model = generate_model
@@ -388,6 +388,7 @@ def build_rag_prompt(user_question: str, contexts: List[Dict[str, Any]]) -> str:
     - 尽量引用具体片段内容（可点名“片段1/2/3”）
     - 不要胡编
     - 点名后在末尾添加引用来源，例如：“（片段2原文）”
+    "用户问什么就回答什么，不要回答多余内容。\n\n"
     """
 
 
@@ -398,8 +399,8 @@ async def ingest_folder(
     docs_dir: str,
     chunk_size: int = 900,
     chunk_overlap: int = 150,
-    batch_size: int = 32,
-    concurrency: int = 16,
+    batch_size: int = 128,
+    concurrency: int = 128,
 ):
     docs = load_documents(docs_dir)
     if not docs:
@@ -463,6 +464,8 @@ async def ingest_folder(
 async def answer_with_rag_stream(
     rag: ChromaRAG,
     ollama: OllamaClient,
+    llm_model: str,
+    embedding_model: str,
     question: str,
     top_k: int = 5,
 ):
@@ -538,6 +541,7 @@ def build_react_prompt(question: str, scratchpad: str, mcp_tools_desc: str = "")
         "- 当知识库中没有相关信息时，使用 web_search 搜索互联网。\n"
         "- 如需结束，使用 Action: finish 并在 Final Answer 给出中文答复。\n"
         "- 不要编造未检索到的事实。\n\n"
+        "用户问什么就回答什么，不要回答多余内容。\n\n"
         "格式要求（务必遵守）：\n"
         f"{format_hint}\n\n"
         f"用户问题: {question}\n\n"
@@ -696,7 +700,7 @@ async def main():
 
     print("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
     print("  /count   查看向量库条目数")
-    print("  /react <q>  以 ReAct 模式回答")
+    print("  /react  以 ReAct 模式回答")
     print("  /exit    退出")
 
     try:
