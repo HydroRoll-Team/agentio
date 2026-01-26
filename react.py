@@ -30,12 +30,12 @@ class OllamaClient:
         >>> client = OllamaClient("http://localhost:11434")
         >>> response = await client.generate("gemma3:12b", "你好")
         >>> async for token in client.stream_generate("gemma3:12b", "你好"):
-        ...     print(token, end="")
+        ...     logger.info(token, end="")
         >>> embedding = await client.embed("nomic-embed-text", "Hello world")
     """
 
     def __init__(
-        self, api_base: str = "http://localhost:11434", generate_model: str = "qwen3:0.6b", embed_model: str = "nomic-embed-text"
+        self, api_base: str = "http://localhost:11434", generate_model: str = "gemma3:4b", embed_model: str = "nomic-embed-text"
     ):
         self.api_base = api_base.rstrip("/")
         self.generate_model = generate_model
@@ -57,7 +57,7 @@ class OllamaClient:
         Example:
             >>> client = OllamaClient()
             >>> response = await client.generate("介绍一下 Python")
-            >>> print(response)
+            >>> logger.info(response)
         """
         url = f"{self.api_base}/api/generate"
         payload = {"model": self.generate_model, "prompt": _prompt, "stream": False}
@@ -85,7 +85,7 @@ class OllamaClient:
 
         Example:
             >>> async for token in client.stream_generate("你好"):
-            ...     print(token, end="", flush=True)
+            ...     logger.info(token, end="", flush=True)
         """
         url = f"{self.api_base}/api/generate"
         payload = {"model": self.generate_model, "prompt": _prompt, "stream": True}
@@ -118,7 +118,7 @@ class OllamaClient:
 
         Example:
             >>> embedding = await client.embed("Hello world")
-            >>> print(len(embedding))
+            >>> logger.info(len(embedding))
         """
         url = f"{self.api_base}/api/embeddings"
         payload = {"model": self.embed_model, "prompt": text}
@@ -141,7 +141,7 @@ def read_pdf(path: str) -> str:
 
     Example:
         >>> text = read_pdf("document.pdf")
-        >>> print(text)
+        >>> logger.info(text)
     """
     reader = PdfReader(path)
     texts = []
@@ -207,7 +207,7 @@ def chunk_text(text: str, chunk_size: int = 900, chunk_overlap: int = 150) -> Li
 
     Example:
         >>> chunks = chunk_text("Long text...", chunk_size=500, chunk_overlap=100)
-        >>> print(f"Created {len(chunks)} chunks")
+        >>> logger.info(f"Created {len(chunks)} chunks")
     """
     text = normalize_whitespace(text)
     paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
@@ -258,7 +258,7 @@ def make_id(source: str, chunk_index: int, chunk_text: str) -> str:
 
     Example:
         >>> doc_id = make_id("doc.pdf", 0, "First chunk")
-        >>> print(doc_id)
+        >>> logger.info(doc_id)
     """
     h = hashlib.sha1(
         (source + str(chunk_index) + chunk_text).encode("utf-8", errors="ignore")
@@ -340,7 +340,7 @@ class ChromaRAG:
 
         Example:
             >>> results = rag.query([0.1, 0.2], n_results=5)
-            >>> print(results["documents"])
+            >>> logger.info(results["documents"])
         """
         return self.col.query(
             query_embeddings=[query_embedding],
@@ -364,7 +364,7 @@ def build_rag_prompt(user_question: str, contexts: List[Dict[str, Any]]) -> str:
 
     Example:
         >>> prompt = build_rag_prompt("什么是 Python?", contexts)
-        >>> print(prompt)
+        >>> logger.info(prompt)
     """
     ctx_blocks = []
     for i, c in enumerate(contexts, 1):
@@ -404,10 +404,10 @@ async def ingest_folder(
 ):
     docs = load_documents(docs_dir)
     if not docs:
-        print(f"未找到可导入文档：{docs_dir}")
+        logger.info(f"未找到可导入文档：{docs_dir}")
         return
 
-    print(f"发现 {len(docs)} 个文档，开始切块+入库…")
+    logger.info(f"发现 {len(docs)} 个文档，开始切块+入库…")
 
     sem = asyncio.Semaphore(concurrency)
 
@@ -424,7 +424,7 @@ async def ingest_folder(
         rag.upsert(
             ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas
         )
-        print(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
+        logger.info(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
         ids, metadatas, documents, embeddings = [], [], [], []
 
     # 收集所有 chunks
@@ -458,7 +458,7 @@ async def ingest_folder(
         pending.clear()
         await flush_batch()
 
-    print("导入完成。")
+    logger.info("导入完成。")
 
 
 async def answer_with_rag_stream(
@@ -488,7 +488,7 @@ async def answer_with_rag_stream(
 
     Example:
         >>> async for token in answer_with_rag_stream(rag, ollama, "gemma3:12b", "nomic-embed-text", "什么是 Python?"):
-        ...     print(token, end="", flush=True)
+        ...     logger.info(token, end="", flush=True)
     """
     q_emb = await ollama.embed(question)
 
@@ -558,6 +558,7 @@ def _summarize_contexts_for_observation(contexts: List[Dict[str, Any]]) -> str:
         idx = ctx.get("chunk_index", "?")
         snippet = ctx.get("text", "")[:320].replace("\n", " ")
         lines.append(f"{i}. {src} | chunk={idx} | {snippet}")
+    logger.info("\n".join(lines))
     return "\n".join(lines)
 
 
@@ -597,21 +598,27 @@ class ReActAgent:
                     "distance": dist,
                 }
             )
-
+        logger.info("contexts from search_kb:")
+        logger.info(contexts)
         return _summarize_contexts_for_observation(contexts)
 
     async def _call_tool(self, action: str, action_input: str) -> str:
         if self.mcp and action in self.mcp.list_tools():
+            logger.info(f"Calling MCP tool: {action}")
             try:
-                logger.info(f"Calling MCP tool: {action}")
                 result = await self.mcp.call_tool(action, {"query": action_input})
+                logger.info("MCP tool result:")
+                logger.info(result)
                 return result
             except Exception as e:
                 return f"Error calling {action}: {str(e)}"
 
         if action == "search_kb":
-            return await self._tool_search_kb(action_input)
-
+            logger.info("Calling built-in tool: search_kb")
+            kb_result = await self._tool_search_kb(action_input)
+            logger.info("search_kb result:")
+            logger.info(kb_result)
+            return kb_result
         return f"Unsupported action: {action}"
 
     async def run(self, question: str) -> str:
@@ -620,26 +627,30 @@ class ReActAgent:
         mcp_tools_desc = ""
         if self.mcp:
             mcp_tools_desc = self.mcp.get_tools_description()
+            logger.info(f"MCP tools available:\n{mcp_tools_desc}")
 
         for turn in range(self.max_turns):
-            print(f"ReAct 轮次 {turn + 1}/{self.max_turns}")
+            logger.info(f"ReAct 轮次 {turn + 1}/{self.max_turns}")
             
             prompt_text = build_react_prompt(
                 question, "\n".join(scratch), mcp_tools_desc
             )
+            logger.info("="*20)
+            logger.info(prompt_text)
             reply = await self.ollama.generate(prompt_text)
+            logger.info(f"LLM 回复:\n{reply}\n")
 
             #! 提取 Thought
             thought_match = re.search(r"Thought\s*:\s*(.+?)(?=\nAction|$)", reply, re.S)
             if thought_match:
                 thought = thought_match.group(1).strip()
-                print(f"Thought: {thought}")
+                logger.info(f"Thought: {thought}")
             
             #! 检查是否有 Final Answer
             final_match = re.search(r"Final Answer\s*:\s*(.+)", reply, re.S)
             if final_match:
                 final_answer = final_match.group(1).strip()
-                print(f"\nFinal Answer: {final_answer}\n")
+                logger.info(f"\nFinal Answer: {final_answer}\n")
                 return final_answer
 
             #! 提取 Action 和 Action Input
@@ -647,27 +658,32 @@ class ReActAgent:
             input_match = re.search(r"Action Input\s*:\s*(.+?)(?=\n|$)", reply, re.S)
 
             if not action_match or not input_match:
-                print(f"无法解析 Action，返回原始回复")
+                logger.info(f"无法解析 Action，返回原始回复")
                 return reply.strip()
 
             action = action_match.group(1).strip()
             action_input = input_match.group(1).strip()
             
-            print(f"Action: {action}")
-            print(f"Action Input: {action_input}")
+            logger.info(f"Action: {action}")
+            logger.info(f"Action Input: {action_input}")
+            logger.info("调用工具…")
 
             #! 执行工具并获取观察结果
             observation = await self._call_tool(action, action_input)
-            print(f"Observation: {observation[:300]}{'...' if len(observation) > 300 else ''}")
+            logger.info("="*20)
+            logger.info(observation)
+            logger.info(f"Observation: {observation[:300]}{'...' if len(observation) > 300 else ''}")
             
             scratch.append(reply.strip())
             scratch.append(f"Observation: {observation}")
+            
+            logger.info(scratch)
 
         return "达到最大轮次仍未给出最终答案。"
 
 
 async def main():
-    llm_model = "gemma3:12b"
+    llm_model = "gemma3:4b"
     embedding_model = "nomic-embed-text"  
     docs_dir = "./knowledge"
 
@@ -698,17 +714,17 @@ async def main():
 
     loop = asyncio.get_event_loop()
 
-    print("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
-    print("  /count   查看向量库条目数")
-    print("  /react  以 ReAct 模式回答")
-    print("  /exit    退出")
+    logger.info("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
+    logger.info("  /count   查看向量库条目数")
+    logger.info("  /react  以 ReAct 模式回答")
+    logger.info("  /exit    退出")
 
     try:
         while True:
             try:
                 user_input = await loop.run_in_executor(None, lambda: prompt("User: "))
             except (asyncio.CancelledError, KeyboardInterrupt):
-                print("\n退出程序...")
+                logger.info("\n退出程序...")
                 break
             
             cmd = user_input.strip()
@@ -717,7 +733,7 @@ async def main():
                 break
 
             if cmd == "/count":
-                print(f"Chroma count = {rag.count()}")
+                logger.info(f"Chroma count = {rag.count()}")
                 continue
 
             if cmd == "/ingest":
@@ -732,14 +748,13 @@ async def main():
             if cmd.startswith("/react"):
                 question = cmd[len("/react") :].strip()
                 if not question:
-                    print("请在 /react 后输入问题。")
+                    logger.info("请在 /react 后输入问题。")
                     continue
-                print("ReAct agent 正在思考…")
+                logger.info("ReAct agent 正在思考…")
                 answer = await agent.run(question)
-                print(f"LLM: {answer}")
+                logger.info(f"{answer}")
                 continue
 
-            print("LLM: ", end="", flush=True)
             async for token in answer_with_rag_stream(
                 rag=rag,
                 ollama=ollama,
@@ -748,8 +763,8 @@ async def main():
                 question=user_input,
                 top_k=5,
             ):
-                print(token, end="", flush=True)
-            print("\n")
+                logger.info(token, end="", flush=True)
+            logger.info("\n")
     finally:
         if mcp_manager:
             try:
