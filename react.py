@@ -18,7 +18,7 @@ from chromadb.config import Settings
 from prompt_toolkit import prompt
 from pypdf import PdfReader
 
-from mcp_client import MCPClientManager
+from examples.mcp_client import MCPClientManager
 
 
 class OllamaClient:

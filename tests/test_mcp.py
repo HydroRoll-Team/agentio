@@ -9,7 +9,7 @@ MCP 服务器的集成。测试包括连接 MCP 服务器、调用工具以及�
 import asyncio
 from loguru import logger
 
-from mcp_client import MCPClientManager
+from examples.mcp_client import MCPClientManager
 
 async def test_react_with_mcp():
     """
@@ -39,7 +39,7 @@ async def test_react_with_mcp():
     """
     print("\nTesting ReAct Agent with MCP")
     
-    from src.react import ChromaRAG, OllamaClient, ReActAgent
+    from examples.react import ChromaRAG, OllamaClient, ReActAgent
     
     rag = ChromaRAG(persist_dir="./chroma_db", collection_name="kb_docs_v1")
     ollama = OllamaClient("http://localhost:11434")
