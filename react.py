@@ -17,7 +17,6 @@ import chromadb
 from chromadb.config import Settings
 from prompt_toolkit import prompt
 from pypdf import PdfReader
-from loguru import logger
 
 from mcp_client import MCPClientManager
 
@@ -30,7 +29,7 @@ class OllamaClient:
         >>> client = OllamaClient("http://localhost:11434")
         >>> response = client.generate("你好")
         >>> for token in client.stream_generate("你好"):
-        ...     logger.info(token)
+        ...     print(token)
         >>> embedding = client.embed("Hello world")
     """
 
@@ -244,10 +243,10 @@ def ingest_folder(
 ):
     docs = load_documents(docs_dir)
     if not docs:
-        logger.info(f"未找到可导入文档：{docs_dir}")
+        print(f"未找到可导入文档：{docs_dir}")
         return
 
-    logger.info(f"发现 {len(docs)} 个文档，开始切块+入库…")
+    print(f"发现 {len(docs)} 个文档，开始切块+入库…")
 
     ids: List[str] = []
     metadatas: List[Dict[str, Any]] = []
@@ -259,7 +258,7 @@ def ingest_folder(
         if not ids:
             return
         rag.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
-        logger.info(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
+        print(f"已写入 {len(ids)} chunks，当前库总量：{rag.count()}")
         ids, metadatas, documents, embeddings = [], [], [], []
 
     for d in docs:
@@ -280,7 +279,7 @@ def ingest_folder(
                 flush_batch()
 
     flush_batch()
-    logger.info("导入完成。")
+    print("导入完成。")
 
 
 def answer_with_rag_stream(
@@ -356,7 +355,7 @@ def _summarize_contexts_for_observation(contexts: List[Dict[str, Any]]) -> str:
         idx = ctx.get("chunk_index", "?")
         snippet = ctx.get("text", "")[:320].replace("\n", " ")
         lines.append(f"{i}. {src} | chunk={idx} | {snippet}")
-    logger.info("\n".join(lines))
+    print("\n".join(lines))
     return "\n".join(lines)
 
 
@@ -401,30 +400,30 @@ class ReActAgent:
                     "distance": dist,
                 }
             )
-        logger.info("contexts from search_kb:")
-        logger.info(contexts)
+        print("contexts from search_kb:")
+        print(contexts)
         return _summarize_contexts_for_observation(contexts)
 
     def _call_tool(self, action: str, action_input: str) -> str:
         if self.mcp and action in self.mcp.list_tools():
-            logger.info(f"Calling MCP tool: {action}")
+            print(f"Calling MCP tool: {action}")
             if not self.mcp_loop:
                 return "MCP event loop not available."
             try:
                 result = self.mcp_loop.run_until_complete(
                     self.mcp.call_tool(action, {"query": action_input})
                 )
-                logger.info("MCP tool result:")
-                logger.info(result)
+                print("MCP tool result:")
+                print(result)
                 return result
             except Exception as e:
                 return f"Error calling {action}: {e}"
 
         if action == "search_kb":
-            logger.info("Calling built-in tool: search_kb")
+            print("Calling built-in tool: search_kb")
             kb_result = self._tool_search_kb(action_input)
-            logger.info("search_kb result:")
-            logger.info(kb_result)
+            print("search_kb result:")
+            print(kb_result)
             return kb_result
         return f"Unsupported action: {action}"
 
@@ -434,21 +433,21 @@ class ReActAgent:
         mcp_tools_desc = ""
         if self.mcp:
             mcp_tools_desc = self.mcp.get_tools_description()
-            logger.info(f"MCP tools available:\n{mcp_tools_desc}")
+            print(f"MCP tools available:\n{mcp_tools_desc}")
 
         for turn in range(self.max_turns):
-            logger.info(f"ReAct 轮次 {turn + 1}/{self.max_turns}")
+            print(f"ReAct 轮次 {turn + 1}/{self.max_turns}")
 
             prompt_text = build_react_prompt(question, "\n".join(scratch), mcp_tools_desc)
-            logger.info("=" * 20)
-            logger.info(prompt_text)
+            print("=" * 20)
+            print(prompt_text)
             reply = self.ollama.generate(prompt_text, model=self.llm_model, stop=["Observation:"])
-            logger.debug(f"LLM 回复:\n{reply}\n")
+            print(f"LLM 回复:\n{reply}\n")
 
             thought_match = re.search(r"Thought\s*:\s*(.+?)(?=\nAction|$)", reply, re.S)
             if thought_match:
                 thought = thought_match.group(1).strip()
-                logger.info(f"Thought: {thought}")
+                print(f"Thought: {thought}")
 
             action_match = re.search(r"Action\s*:\s*([a-zA-Z_]+)", reply)
             input_match = re.search(r"Action Input\s*:\s*(.+?)(?=\n|$)", reply, re.S)
@@ -459,17 +458,17 @@ class ReActAgent:
 
                 # 显式处理结束状态：当 Action 为 finish 时，Action Input 就是最终答案
                 if action.lower() == "finish":
-                    logger.info(f"\nFinal Answer (from Action): {action_input}\n")
+                    print(f"\nFinal Answer (from Action): {action_input}\n")
                     return action_input
 
-                logger.info(f"Action: {action}")
-                logger.info(f"Action Input: {action_input}")
-                logger.info("调用工具…")
+                print(f"Action: {action}")
+                print(f"Action Input: {action_input}")
+                print("调用工具…")
 
                 observation = self._call_tool(action, action_input)
-                logger.info("=" * 20)
-                logger.info(observation)
-                logger.info(f"Observation: {observation[:300]}{'...' if len(observation) > 300 else ''}")
+                print("=" * 20)
+                print(observation)
+                print(f"Observation: {observation[:300]}{'...' if len(observation) > 300 else ''}")
 
                 scratch.append(reply.strip())
                 scratch.append(f"Observation: {observation}")
@@ -478,10 +477,10 @@ class ReActAgent:
             final_match = re.search(r"Final Answer\s*:\s*(.+)", reply, re.S)
             if final_match:
                 final_answer = final_match.group(1).strip()
-                logger.info(f"\nFinal Answer: {final_answer}\n")
+                print(f"\nFinal Answer: {final_answer}\n")
                 return final_answer
 
-            logger.info("无法解析回复，尝试直接作为答案")
+            print("无法解析回复，尝试直接作为答案")
             return reply.strip()
 
         return "达到最大轮次仍未给出最终答案。"
@@ -505,7 +504,7 @@ def main():
             mcp_manager.connect_server(name="search", command="python", args=[server_script])
         )
     except Exception as e:
-        logger.warning(f"Failed to connect MCP server: {e}. Continuing without MCP support.")
+        print(f"Failed to connect MCP server: {e}. Continuing without MCP support.")
         mcp_manager = None
         if mcp_loop:
             mcp_loop.close()
@@ -523,17 +522,17 @@ def main():
         mcp_loop=mcp_loop,
     )
 
-    logger.info("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
-    logger.info("  /count   查看向量库条目数")
-    logger.info("  /react  以 ReAct 模式回答")
-    logger.info("  /exit    退出")
+    print("  /ingest 导入 ./knowledge 下的 PDF/MD 到 Chroma")
+    print("  /count   查看向量库条目数")
+    print("  /react  以 ReAct 模式回答")
+    print("  /exit    退出")
 
     try:
         while True:
             try:
                 user_input = prompt("User: ")
             except (KeyboardInterrupt, EOFError):
-                logger.info("\n退出程序...")
+                print("\n退出程序...")
                 break
 
             cmd = user_input.strip()
@@ -542,7 +541,7 @@ def main():
                 break
 
             if cmd == "/count":
-                logger.info(f"Chroma count = {rag.count()}")
+                print(f"Chroma count = {rag.count()}")
                 continue
 
             if cmd == "/ingest":
@@ -557,11 +556,11 @@ def main():
             if cmd.startswith("/react"):
                 question = cmd[len("/react") :].strip()
                 if not question:
-                    logger.info("请在 /react 后输入问题。")
+                    print("请在 /react 后输入问题。")
                     continue
-                logger.info("ReAct agent 正在思考…")
+                print("ReAct agent 正在思考…")
                 answer = agent.run(question)
-                logger.info(f"{answer}")
+                print(f"{answer}")
                 continue
 
             for token in answer_with_rag_stream(
@@ -579,7 +578,7 @@ def main():
             try:
                 mcp_loop.run_until_complete(mcp_manager.close())
             except Exception as e:
-                logger.debug(f"Error closing MCP manager: {e}")
+                print(f"Error closing MCP manager: {e}")
             finally:
                 mcp_loop.close()
                 asyncio.set_event_loop(None)

@@ -1,6 +1,5 @@
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from loguru import logger
 
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters as ServerParams
@@ -66,7 +65,7 @@ class MCPClientManager:
             ...     env={"PATH": "/custom/path"}
             ... )
         """
-        logger.info(f"Connecting to MCP server '{name}' with command: {command} {' '.join(args)}")
+        print(f"Connecting to MCP server '{name}' with command: {command} {' '.join(args)}")
         
         try:
             server_params = ServerParams(
@@ -86,10 +85,10 @@ class MCPClientManager:
             self._server_processes[name] = (stdio_ctx, session_ctx)
             await self._discover_tools(name, session)
             
-            logger.success(f"Successfully connected to MCP server '{name}'")
+            print(f"Successfully connected to MCP server '{name}'")
             
         except Exception as e:
-            logger.error(f"Failed to connect to MCP server '{name}': {e}")
+            print(f"Failed to connect to MCP server '{name}': {e}")
             raise
     
     async def _discover_tools(self, server_name: str, session: ClientSession):
@@ -111,7 +110,7 @@ class MCPClientManager:
         """
         try:
             tools_response = await session.list_tools()
-            logger.info(f"Discovered {len(tools_response.tools)} tools from '{server_name}'")
+            print(f"Discovered {len(tools_response.tools)} tools from '{server_name}'")
             for tool in tools_response.tools:
                 tool_schema = ToolSchema(
                     name=tool.name,
@@ -121,10 +120,10 @@ class MCPClientManager:
                 )
                 
                 self.tools[tool.name] = tool_schema
-                logger.debug(f"Registered tool: {tool.name} ({tool_schema.description})")
+                print(f"Registered tool: {tool.name} ({tool_schema.description})")
                 
         except Exception as e:
-            logger.error(f"Failed to discover tools from '{server_name}': {e}")
+            print(f"Failed to discover tools from '{server_name}': {e}")
             raise
     
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
@@ -165,7 +164,7 @@ class MCPClientManager:
         session = self.servers[server_name]
         
         try:
-            logger.debug(f"Calling tool '{tool_name}' with arguments: {arguments}")
+            print(f"Calling tool '{tool_name}' with arguments: {arguments}")
             
             result = await session.call_tool(tool_name, arguments=arguments)
             
@@ -187,14 +186,14 @@ class MCPClientManager:
                             content_parts.append(str(item))
                 
                 result_text = "\n".join(content_parts)
-                logger.debug(f"Tool '{tool_name}' returned: {result_text[:200]}...")
+                print(f"Tool '{tool_name}' returned: {result_text[:200]}...")
                 return result_text
             else:
                 return str(result)
                 
         except Exception as e:
             error_msg = f"Error calling tool '{tool_name}': {e}"
-            logger.error(error_msg)
+            print(error_msg)
             return error_msg
     
     def get_tools_description(self) -> str:
@@ -256,10 +255,10 @@ class MCPClientManager:
                     # 退出标准输入输出上下文
                     await stdio_ctx.__aexit__(None, None, None)
                 # 记录断开连接的信息
-                logger.info(f"Disconnected from MCP server '{name}'")
+                print(f"Disconnected from MCP server '{name}'")
             except Exception as e:
                 # 记录断开连接时可能出现的错误
-                logger.warning(f"Error disconnecting from '{name}': {e}")
+                print(f"Error disconnecting from '{name}': {e}")
         
         # 清空所有服务器的字典
         self.servers.clear()

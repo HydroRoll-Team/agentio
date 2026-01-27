@@ -37,7 +37,7 @@ async def test_react_with_mcp():
         如果 MCP 服务器连接失败，测试会继续进行但不会使用 MCP 工具。
         该测试需要本地运行 Ollama 服务器和 ChromaDB 数据库。
     """
-    logger.info("\nTesting ReAct Agent with MCP")
+    print("\nTesting ReAct Agent with MCP")
     
     from react import ChromaRAG, OllamaClient, ReActAgent
     
@@ -52,7 +52,7 @@ async def test_react_with_mcp():
             args=["mcp_servers/search_server.py"]
         )
     except Exception as e:
-        logger.warning(f"Could not connect MCP: {e}")
+        print(f"Could not connect MCP: {e}")
         mcp_manager = None
 
     agent = ReActAgent(
@@ -67,15 +67,15 @@ async def test_react_with_mcp():
     
     question = "What is the latest version of Python released in 2026?"
     
-    logger.info(f"Question: {question}")
-    logger.info("Agent is thinking...")
+    print(f"Question: {question}")
+    print("Agent is thinking...")
     
     try:
         answer = await agent.run(question)
-        logger.success(f"Answer: {answer}")
-        logger.success("ReAct agent test passed!")
+        print(f"Answer: {answer}")
+        print("ReAct agent test passed!")
     except Exception as e:
-        logger.error(f"ReAct agent test failed: {e}")
+        print(f"ReAct agent test failed: {e}")
         raise
     finally:
         if mcp_manager:
@@ -86,10 +86,10 @@ async def main():
     try:
         await test_react_with_mcp()
         
-        logger.success("\nAll tests completed successfully!")
+        print("\nAll tests completed successfully!")
         
     except Exception as e:
-        logger.error(f"\nTests failed: {e}")
+        print(f"\nTests failed: {e}")
         raise
 
 
