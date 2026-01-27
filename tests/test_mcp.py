@@ -39,7 +39,7 @@ async def test_react_with_mcp():
     """
     print("\nTesting ReAct Agent with MCP")
     
-    from react import ChromaRAG, OllamaClient, ReActAgent
+    from src.react import ChromaRAG, OllamaClient, ReActAgent
     
     rag = ChromaRAG(persist_dir="./chroma_db", collection_name="kb_docs_v1")
     ollama = OllamaClient("http://localhost:11434")
