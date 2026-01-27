@@ -14,7 +14,7 @@ from pypdf import PdfReader
 
 class OllamaClient:
     def __init__(
-        self, api_base: str = "http://localhost:11434", model_name: str = "gemma3:12b"
+        self, api_base: str = "http://localhost:11434", model_name: str = "gemma3:4b"
     ):
         self.api_base = api_base.rstrip("/")
         self.model_name = model_name

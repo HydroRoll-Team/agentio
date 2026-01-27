@@ -7,8 +7,6 @@ MCP 服务器的集成。测试包括连接 MCP 服务器、调用工具以及�
 """
 
 import asyncio
-from loguru import logger
-
 from examples.mcp_client import MCPClientManager
 
 async def test_react_with_mcp():

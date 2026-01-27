@@ -18,7 +18,7 @@ from chromadb.config import Settings
 from prompt_toolkit import prompt
 from pypdf import PdfReader
 
-from examples.mcp_client import MCPClientManager
+from mcp_client import MCPClientManager
 
 
 class OllamaClient:
@@ -427,7 +427,7 @@ class ReActAgent:
             return kb_result
         return f"Unsupported action: {action}"
 
-    def run(self, question: str) -> str:
+    async def run(self, question: str) -> str:
         scratch: List[str] = []
 
         mcp_tools_desc = ""

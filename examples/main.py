@@ -33,5 +33,5 @@ async def main(model_name: str):
         
 
 if __name__ == "__main__":
-    model_name = "gemma3:12b"
+    model_name = "gemma3:4b"
     asyncio.run(main(model_name))
